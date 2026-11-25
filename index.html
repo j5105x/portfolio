@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>持股計算</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="持股計算">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2563eb">
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1c1f24;--mut:#6b7280;--bd:#e3e6ea;--ac:#2563eb;--up:#d92d20;--dn:#039855;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1e2126;--tx:#eceff3;--mut:#9aa3af;--bd:#2f343b;--ac:#6ea0ff;--up:#ff6b5e;--dn:#34d399}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#14161a;--card:#1e2126;--tx:#eceff3;--mut:#9aa3af;--bd:#2f343b;--ac:#6ea0ff;--up:#ff6b5e;--dn:#34d399}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;padding:16px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:20px;margin:0 0 4px}
+p.sub{color:var(--mut);margin:0 0 14px;font-size:13px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.row{border:1px solid var(--bd);border-radius:10px;padding:10px;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:end}.grid input{min-width:0}
+label{display:block;font-size:12px;color:var(--mut);margin-bottom:2px}
+input,select{width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:15px}
+input:disabled{opacity:.6}
+.top{display:flex;gap:8px;margin-bottom:8px}
+.pie{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center}.pie svg{width:200px;height:200px;flex:none}.leg{flex:1;min-width:190px;font-size:13px}.leg div{display:flex;align-items:center;gap:6px;padding:3px 0}.leg i{width:10px;height:10px;border-radius:50%;flex:none}.leg span{margin-left:auto;text-align:right}.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;border-top:1px solid var(--bd);margin-top:10px;padding-top:10px}.sum b{display:block;font-size:16px}.sum span{font-size:12px;color:var(--mut)}.top{flex-wrap:wrap}.top>*:first-child{flex:1 1 100%;min-width:0}.top select{flex:1;min-width:0}
+button{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:8px 12px;font-size:14px}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+.adds{display:flex;gap:8px;flex-wrap:wrap}
+.big{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;text-align:center}
+.big b{display:block;font-size:20px}.big>div{padding:4px 0}.calc{font-size:13px;color:var(--mut);margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 14px}.calc b{color:var(--tx);font-weight:600}
+.big span{font-size:12px;color:var(--mut)}
+.up{color:var(--up)}.dn{color:var(--dn)}.warn{color:#b54708;font-size:13px;margin-top:8px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;min-width:420px}
+th,td{padding:6px;text-align:right;border-bottom:1px solid var(--bd)}
+th:first-child,td:first-child{text-align:left}
+small{color:var(--mut)}
+</style>
+</head>
+<body>
+<main>
+<h1>台股持股曝險計算器</h1>
+<p class="sub">輸入股數、成本、現價，自動統計總資產、各類比重與曝險。</p>
+
+<div class="card">
+  <div class="big">
+    <div><b id="sTotal">-</b><span>總資產（含現金）</span></div>
+    <div><b id="sExp">-</b><span>整體曝險倍率</span></div>
+    <div><b id="sPL">-</b><span>未實現損益</span></div>
+    <div><b id="sExpAmt">-</b><span>總曝險金額</span></div>
+    <div><b id="sCost">-</b><span>總持有成本</span></div>
+    <div><b id="sMV">-</b><span>持股市值</span></div>
+  </div>
+  <div id="alert" class="warn" style="display:none;margin:0 0 8px"></div>
+  <div class="tw"><table>
+    <thead><tr><th>類別</th><th>市值</th><th>比重</th><th>曝險倍率</th><th>損益</th></tr></thead>
+    <tbody id="cats"></tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>資產配置</b><select id="pmode" style="width:auto"><option value="h">依持股</option><option value="c">依類別</option></select></div>
+  <div id="pie"></div>
+</div>
+
+<div class="card">
+  <b>快速再平衡</b>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin:8px 0">
+    <div><label>目標曝險倍率</label><input type="number" step="any" inputmode="decimal" id="tgt" placeholder="例如 1"></div>
+    <div><label>目標現金比例 %（留空＝維持現狀）</label><input type="number" step="any" inputmode="decimal" id="tcash" placeholder="例如 20"></div>
+    <div><label>目前曝險倍率</label><input id="curx" disabled></div>
+    <div><label>目前現金比例</label><input id="curc" disabled></div>
+  </div>
+  <div id="rb" style="font-size:14px;line-height:1.7"></div>
+  <small>用「正二」與「1 倍現股（原型ETF／個股）」同時達成目標現金比例與曝險倍率，總資產不變。買進現股時優先加碼原型ETF，賣出時依市值比例分配。未含手續費與證交稅（ETF 賣出約 0.1%）。</small>
+</div>
+
+<div class="card">
+  <b>加碼試算</b>
+  <div style="margin:8px 0"><label>本次投入金額（元）：依上方目標曝險與現金比例分配</label><input type="number" step="any" inputmode="decimal" id="inv" placeholder="例如 200000"></div>
+  <div id="rb2" style="font-size:14px;line-height:1.7"></div>
+  <hr style="border:0;border-top:1px solid var(--bd);margin:12px 0">
+  <b>均價攤平</b>
+  <div class="grid" style="margin:8px 0"><div><label>持股</label><select id="av_sel"></select></div><div><label>加碼張數</label><input type="number" step="any" inputmode="decimal" id="av_n"></div><div><label>加碼價格（空白＝現價）</label><input type="number" step="any" inputmode="decimal" id="av_p"></div></div>
+  <div id="av_out" style="font-size:14px;line-height:1.7"></div>
+</div>
+
+<div class="card">
+  <b>目標配置與警示</b>
+  <div class="grid" style="grid-template-columns:1fr 1fr;margin:8px 0"><div><label>曝險下限（倍）</label><input type="number" step="any" inputmode="decimal" id="lo" placeholder="例如 0.9"></div><div><label>曝險上限（倍）</label><input type="number" step="any" inputmode="decimal" id="hi" placeholder="例如 1.3"></div></div>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:8px"><div><label>原型ETF %</label><input type="number" step="any" inputmode="decimal" id="ta_etf"></div><div><label>個股 %</label><input type="number" step="any" inputmode="decimal" id="ta_stock"></div><div><label>正二 %</label><input type="number" step="any" inputmode="decimal" id="ta_l2"></div><div><label>現金 %</label><input type="number" step="any" inputmode="decimal" id="ta_cash"></div></div>
+  <div id="tab" style="font-size:14px"></div>
+  <small>曝險超出區間時，最上方摘要會變色並提示再平衡。</small>
+</div>
+
+<div class="card">
+  <b>壓力測試</b>
+  <div style="margin:8px 0"><label>自訂大盤下跌 %（負數代表上漲）</label><input type="number" step="any" inputmode="decimal" id="sc2" placeholder="例如 15"></div>
+  <div class="tw"><table><thead><tr><th>大盤</th><th>資產變動</th><th>剩餘資產</th><th>降幅</th><th>跌後曝險</th></tr></thead><tbody id="stress"></tbody></table></div>
+  <small>以「資產變動 = 曝險金額 × 大盤跌幅」估算，原型ETF與個股視為跟大盤 1:1；未含正二的每日複利損耗與追蹤誤差，實際結果會有出入。</small>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><b>歷史走勢</b><select id="hm" style="width:auto"><option value="t">總資產</option><option value="e">曝險倍率</option><option value="c">現金比例</option></select></div>
+  <div id="hist"></div>
+  <div class="adds" style="margin-top:8px"><button id="snap">儲存今日快照</button><button id="hclr">清除紀錄</button></div>
+  <small>每次「套用剪貼簿報價」成功時會自動存一筆，同一天只保留最新一筆。</small>
+</div>
+
+<div class="card">
+  <div class="grid" style="margin-bottom:10px">
+    <div><label>成本輸入方式</label><select id="cmode"><option value="unit">每股成本</option><option value="total">總成本</option></select></div>
+    <div><label>數量單位</label><select id="umode"><option value="lot">張（1張=1000股）</option><option value="share">股</option></select></div>
+  </div>
+  <div class="adds" style="margin-bottom:10px">
+    <button class="p" data-add="etf">＋ 原型ETF</button>
+    <button class="p" data-add="stock">＋ 個股</button>
+    <button class="p" data-add="l2">＋ 正二</button>
+    <button class="p" data-add="cash">＋ 現金</button>
+    <button id="reset">重置</button><button id="sc">① 抓價（捷徑）</button><button id="upd" class="p">② 套用剪貼簿報價</button><button id="pst">手動貼上</button>
+  </div>
+  <div id="ust" class="calc" style="margin:0 0 10px;display:block;white-space:pre-line">尚未更新收盤價。流程：① 執行「抓收盤價」捷徑 → 回到此 App → ② 套用剪貼簿報價</div>
+  <div id="pbox" style="display:none;margin-bottom:10px"><textarea id="pq" rows="4" style="width:100%;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:14px" placeholder="每行一檔：代號 價格&#10;例如：&#10;0050 160.5&#10;2330 1010"></textarea><button id="pgo" class="p" style="margin-top:6px">套用報價</button></div>
+  <div id="rows"></div>
+  <datalist id="tk"></datalist>
+  <small>曝險金額 = 市值 × 曝險倍率（正二預設 2 倍，反一可填 -1）。整體曝險倍率 = 總曝險金額 ÷ 總資產。現金列入總資產，曝險倍率預設 0，因此現金越多整體曝險越低；可自行修改倍率。</small>
+</div>
+
+<div class="card">
+  <small><b>關於收盤價：</b>網頁無法直接讀取證交所資料，所以由 iOS「捷徑」抓取全市場收盤價並複製到剪貼簿，再按「套用剪貼簿報價」，會依你的持股代號自動填入現價。</small>
+</div>
+<div class="card">
+  <b>資料備份</b>
+  <textarea id="bk" rows="3" style="width:100%;margin:8px 0;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:13px" placeholder="按「匯出」會產生備份文字；要還原時貼在這裡再按「匯入」"></textarea>
+  <div class="adds"><button id="bex">匯出（並複製）</button><button id="bim">匯入</button></div>
+  <small>資料只存在這支手機的 App 內。換手機或清除資料前，請先匯出並存到備忘錄。</small>
+</div>
+</main>
+
+<script>
+var NAMES={etf:'原型ETF',stock:'個股',l2:'正二',cash:'現金'};
+var LEV={etf:1,stock:1,l2:2,cash:0};
+var KEY='tw-portfolio-v3';
+var TK={'0050':['元大台灣50','etf'],'006208':['富邦台50','etf'],'0056':['元大高股息','etf'],'00878':['國泰永續高股息','etf'],'00919':['群益台灣精選高息','etf'],'00631L':['元大台灣50正2','l2'],'00663L':['國泰臺灣加權正2','l2'],'00675L':['富邦臺灣加權正2','l2'],'00685L':['群益臺灣加權正2','l2'],'2330':['台積電','stock'],'2317':['鴻海','stock'],'2454':['聯發科','stock'],'2308':['台達電','stock'],'2412':['中華電','stock'],'2881':['富邦金','stock'],'2882':['國泰金','stock']};
+(function(){var h='';Object.keys(TK).forEach(function(k){h+='<option value="'+k+'">'+TK[k][0]+'</option>';});document.getElementById('tk').innerHTML=h;})();
+function findTk(v){v=String(v||'').trim().toUpperCase();for(var k in TK){if(k===v||TK[k][0].toUpperCase()===v)return k;}return null;}
+var st=null;
+function defaults(){return {mode:'unit',unit:'lot',rows:[
+ {cat:'cash',code:'現金',amt:100000,lev:0},
+ {cat:'etf',code:'0050',n:1,cost:150,px:160,lev:1},
+ {cat:'stock',code:'2330',n:0.2,cost:900,px:1000,lev:1},
+ {cat:'l2',code:'00631L',n:2,cost:20,px:24,lev:2}]};}
+try{
+  var s=localStorage.getItem(KEY);
+  if(s){st=JSON.parse(s);}
+  else{
+    var old=localStorage.getItem('tw-portfolio-v2');
+    st=old?JSON.parse(old):defaults();
+    if(old&&Array.isArray(st.rows)&&st.unit!=='lot'){
+      st.rows.forEach(function(r){if(r.n!==''&&r.n!==undefined)r.n=+((parseFloat(r.n)||0)/1000).toFixed(6);});
+    }
+    st.unit='lot';
+  }
+}catch(e){st=defaults();}
+if(!st||!Array.isArray(st.rows))st=defaults();
+if(!st.unit){st.unit='lot';}
+function U(){return st.unit==='lot'?1000:1;}
+function migrateCash(){if(parseFloat(st.cash)>0&&!st.rows.some(function(r){return r.cat==='cash';}))st.rows.push({cat:'cash',code:'現金',amt:st.cash,lev:0});st.cash=0;}
+migrateCash();
+
+function num(v){var n=parseFloat(v);return isFinite(n)?n:0;}
+function fmt(n,d){return n.toLocaleString('zh-TW',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});}
+function sg(n,d){return (n>0?'+':'')+fmt(n,d);}
+function cls(n){return n>0?'up':n<0?'dn':'';}
+var COLORS=['#2563eb','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16','#f97316','#64748b'];
+function drawPie(){
+  var mode=document.getElementById('pmode').value,m={},cost=0,mvs=0;
+  st.rows.forEach(function(r){
+    var x=metrics(r);if(r.cat!=='cash'){cost+=x.cost;mvs+=x.mv;}
+    if(x.mv<=0)return;
+    var k=mode==='c'?NAMES[r.cat]:(r.code||NAMES[r.cat]);m[k]=(m[k]||0)+x.mv;
+  });
+  var ks=Object.keys(m),tot=0;ks.forEach(function(k){tot+=m[k];});
+  var pl=mvs-cost,pct=cost>0?pl/cost*100:0;
+  var h='<div class="pie">';
+  if(tot<=0){h+='<small>請先輸入持股資料。</small></div>';document.getElementById('pie').innerHTML=h;return;}
+  var svg='<svg viewBox="0 0 200 200">',a=-Math.PI/2,leg='';
+  ks.forEach(function(k,j){
+    var f=m[k]/tot,c=COLORS[j%COLORS.length];
+    if(f>=0.9999){svg+='<circle cx="100" cy="100" r="92" fill="'+c+'"/><text x="100" y="36" text-anchor="middle" font-size="11" font-weight="600" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="2.5" style="paint-order:stroke">100%</text>';}
+    else{
+      var b=a+f*2*Math.PI,x0=100+92*Math.cos(a),y0=100+92*Math.sin(a),x1=100+92*Math.cos(b),y1=100+92*Math.sin(b);
+      svg+='<path d="M100 100L'+x0.toFixed(2)+' '+y0.toFixed(2)+'A92 92 0 '+(f>0.5?1:0)+' 1 '+x1.toFixed(2)+' '+y1.toFixed(2)+'Z" fill="'+c+'"/>';
+      if(f>=0.04){var md=(a+b)/2;svg+='<text x="'+(100+73*Math.cos(md)).toFixed(1)+'" y="'+(100+73*Math.sin(md)+4).toFixed(1)+'" text-anchor="middle" font-size="11" font-weight="600" fill="#fff" stroke="rgba(0,0,0,.4)" stroke-width="2.5" style="paint-order:stroke">'+(f*100).toFixed(1)+'%</text>';}
+      a=b;
+    }
+    leg+='<div><i style="background:'+c+'"></i>'+k+'<span>'+fmt(m[k])+'　'+(f*100).toFixed(1)+'%</span></div>';
+  });
+  svg+='<circle cx="100" cy="100" r="54" fill="var(--card)"/><text x="100" y="96" text-anchor="middle" font-size="11" fill="var(--mut)">總資產</text><text x="100" y="114" text-anchor="middle" font-size="14" font-weight="600" fill="var(--tx)">'+fmt(tot)+'</text></svg>';
+  h+=svg+'<div class="leg">'+leg+'</div></div>';
+  h+='<div class="sum"><div><b>'+fmt(cost)+'</b><span>總持有成本</span></div><div><b>'+fmt(mvs)+'</b><span>目前市值</span></div><div><b class="'+cls(pl)+'">'+sg(pl)+'</b><span>現在損益（'+sg(pct,2)+'%）</span></div></div>';
+  document.getElementById('pie').innerHTML=h;
+}
+function esc(x){return String(x).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function split(list,amt){var w=0;list.forEach(function(o){w+=o.m.mv;});return list.map(function(o){return {o:o,amt:amt*(w>0?o.m.mv/w:1/list.length)};});}
+function rebalance(extra,out){
+  extra=extra||0;out=out||document.getElementById('rb');var eT=parseFloat(st.target);
+  var T=0,E=0,A=0,Aex=0,S=0,Sex=0,C=0,Cex=0,l2=[],sh=[];
+  st.rows.forEach(function(r){var m=metrics(r);T+=m.mv;E+=m.ex;
+    if(r.cat==='l2'){A+=m.mv;Aex+=m.ex;l2.push({r:r,m:m});}
+    else if(r.cat==='cash'){C+=m.mv;Cex+=m.ex;}
+    else{S+=m.mv;Sex+=m.ex;sh.push({r:r,m:m});}});
+  if(!extra){document.getElementById('curx').value=T>0?(E/T).toFixed(2)+'x':'-';
+  document.getElementById('curc').value=T>0?(C/T*100).toFixed(1)+'%':'-';}
+  T+=extra;C+=extra;
+  if(!isFinite(eT)||eT<0||st.target===''||st.target===undefined){out.textContent='輸入目標曝險倍率與目標現金比例，自動算出要買賣多少正二與現股。';return;}
+  if(T<=0){out.textContent='請先輸入持股。';return;}
+  var cr=(st.tcash===undefined||st.tcash==='')?C/T:parseFloat(st.tcash)/100;
+  if(!isFinite(cr)||cr<0||cr>1){out.textContent='目標現金比例請輸入 0 到 100。';return;}
+  var L=A>0?Aex/A:LEV.l2,Ls=S>0?Sex/S:1,c0=C>0?Cex/C:0;
+  if(Math.abs(L-Ls)<1e-9){out.textContent='正二與現股的曝險倍率相同，無法同時調整。';return;}
+  var At=((eT-c0*cr)-Ls*(1-cr))*T/(L-Ls),St=(1-cr)*T-At,Ct=cr*T;
+  if(At<-0.5||St<-0.5){
+    var e1=c0*cr+Ls*(1-cr),e2=c0*cr+L*(1-cr);
+    out.innerHTML='<div class="warn">現金 '+(cr*100).toFixed(1)+'% 時，曝險倍率只能落在 '+Math.min(e1,e2).toFixed(2)+'x ～ '+Math.max(e1,e2).toFixed(2)+'x 之間，請調整目標。</div>';return;
+  }
+  var dA=At-A,dS=St-S,dC=Ct-C;
+  if(Math.max(Math.abs(dA),Math.abs(dS),Math.abs(dC))<Math.max(1,T*0.002)){out.textContent='目前配置已接近目標，不需調整。';return;}
+  function v(d){return (d>0?'買進 ':'賣出 ')+fmt(Math.abs(d))+' 元';}
+  var h='<div><b>'+(extra?'投入 '+fmt(extra)+' 元後｜':'')+'目標：曝險 '+eT.toFixed(2)+'x、現金 '+(cr*100).toFixed(1)+'%</b>（'+(extra?'投入後、調整前 ':'現在 ')+(E/T).toFixed(2)+'x、'+(C/T*100).toFixed(1)+'%）</div>';
+  h+='<div>正二：'+fmt(A)+' → '+fmt(At)+'（'+v(dA)+'）</div>';
+  h+='<div>1倍現股：'+fmt(S)+' → '+fmt(St)+'（'+v(dS)+'）</div>';
+  h+='<div>現金：'+fmt(C)+' → '+fmt(Ct)+'（'+(dC>=0?'增加 ':'減少 ')+fmt(Math.abs(dC))+' 元）</div>';
+  var trades=[],xE=0,xC=0;
+  if(Math.abs(dA)>=1){
+    if(l2.length)trades=trades.concat(split(l2,dA));
+    else{h+='<div class="warn">沒有正二持股，請先新增一筆正二列才能算股數。</div>';xE+=dA*(L-c0);xC-=dA;}
+  }
+  if(Math.abs(dS)>=1){
+    var pool=sh;
+    if(dS>0){var ep=sh.filter(function(o){return o.r.cat==='etf';});if(ep.length)pool=ep;}
+    if(pool.length)trades=trades.concat(split(pool,dS));
+    else{h+='<div class="warn">沒有原型ETF／個股持股，請先新增一筆現股列才能算股數。</div>';xE+=dS*(Ls-c0);xC-=dS;}
+  }
+  var aE=E+xE,aC=C+xC;
+  if(trades.length)h+='<div style="margin-top:6px"></div>';
+  trades.forEach(function(t){
+    var amt=t.amt,px=num(t.o.r.px),buy=amt>0,ab=Math.abs(amt);
+    if(ab<1)return;
+    var shs=px>0?ab/px:0,lots=shs/1000,rl=Math.round(lots),ra=rl*1000*px*(buy?1:-1);
+    aE+=ra*(num(t.o.r.lev)-c0);aC-=ra;
+    h+='<div>'+(buy?'買進 ':'賣出 ')+esc(t.o.r.code||NAMES[t.o.r.cat])+'：約 '+fmt(ab)+' 元'+(px>0?' ≈ '+fmt(shs)+' 股（'+lots.toFixed(2)+' 張）；整張 '+rl+' 張':'（請填現價以計算股數）')+'</div>';
+  });
+  if(trades.length||xE||xC)h+='<div style="color:var(--mut)">若全部以整張成交：曝險約 '+(aE/T).toFixed(2)+'x、現金約 '+(aC/T*100).toFixed(1)+'%</div>';
+  out.innerHTML=h;
+}
+function rebAll(){
+  rebalance();
+  var x=num(st.inv),o=document.getElementById('rb2');
+  if(x>0)rebalance(x,o);else o.textContent='輸入投入金額，依「快速再平衡」的目標曝險與現金比例，算出該買哪些。';
+}
+function allocTab(){
+  var el=document.getElementById('tab'),T=0,a={etf:0,stock:0,l2:0,cash:0},ta=st.ta||{},any=false,tot=0,h='';
+  st.rows.forEach(function(r){var m=metrics(r);T+=m.mv;a[r.cat]=(a[r.cat]||0)+m.mv;});
+  ['etf','stock','l2','cash'].forEach(function(k){if(ta[k]!==undefined&&ta[k]!=='')any=true;});
+  if(!any||T<=0){el.textContent='設定各類別目標比例（%），會顯示偏離與需調整的金額。';return;}
+  h='<div class="tw"><table><thead><tr><th>類別</th><th>目前</th><th>目標</th><th>偏離</th><th>調整</th></tr></thead><tbody>';
+  ['etf','stock','l2','cash'].forEach(function(k){
+    var cur=a[k]/T*100,tg=parseFloat(ta[k]);
+    if(!isFinite(tg)){h+='<tr><td>'+NAMES[k]+'</td><td>'+cur.toFixed(1)+'%</td><td>-</td><td>-</td><td>-</td></tr>';return;}
+    tot+=tg;var adj=(tg-cur)/100*T;
+    h+='<tr><td>'+NAMES[k]+'</td><td>'+cur.toFixed(1)+'%</td><td>'+tg+'%</td><td class="'+(Math.abs(cur-tg)>=5?'up':'')+'">'+sg(cur-tg,1)+'pp</td><td>'+(Math.abs(adj)<1?'-':(adj>0?'買進 ':'賣出 ')+fmt(Math.abs(adj)))+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(Math.abs(tot-100)>0.01)h+='<div class="warn">目標合計 '+tot+'%，建議調整為 100%。</div>';
+  el.innerHTML=h;
+}
+function stress(){
+  var T=0,list=[],ds=[10,20,30],c=parseFloat(st.sc2),h='';
+  st.rows.forEach(function(r){var m=metrics(r);T+=m.mv;list.push({mv:m.mv,lev:num(r.lev)});});
+  if(isFinite(c)&&c!==10&&c!==20&&c!==30)ds.push(c);
+  if(T<=0){document.getElementById('stress').innerHTML='';return;}
+  ds.forEach(function(d){
+    var Ta=0,Ea=0;
+    list.forEach(function(o){var v=Math.max(0,o.mv*(1-o.lev*d/100));Ta+=v;Ea+=v*o.lev;});
+    h+='<tr><td>'+(d>0?'-':'+')+Math.abs(d)+'%</td><td class="'+cls(Ta-T)+'">'+sg(Ta-T)+'</td><td>'+fmt(Ta)+'</td><td class="'+cls(Ta-T)+'">'+sg((Ta-T)/T*100,1)+'%</td><td>'+(Ta>0?(Ea/Ta).toFixed(2)+'x':'-')+'</td></tr>';
+  });
+  document.getElementById('stress').innerHTML=h;
+}
+function p2(n){return (n<10?'0':'')+n;}
+function snapshot(){
+  var T=0,E=0,C=0,d=new Date(),ds=d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+  st.rows.forEach(function(r){var m=metrics(r);T+=m.mv;E+=m.ex;if(r.cat==='cash')C+=m.mv;});
+  if(T<=0)return;
+  st.hist=(st.hist||[]).filter(function(x){return x.d!==ds;});
+  st.hist.push({d:ds,t:Math.round(T),e:+(E/T).toFixed(3),c:+(C/T*100).toFixed(2)});
+  st.hist.sort(function(a,b){return a.d<b.d?-1:1;});
+  if(st.hist.length>800)st.hist=st.hist.slice(-800);
+  save();drawHist();
+}
+function drawHist(){
+  var el=document.getElementById('hist'),k=document.getElementById('hm').value,hs=st.hist||[];
+  if(hs.length<2){el.innerHTML='<small>至少需要 2 筆快照才能畫圖（目前 '+hs.length+' 筆）。</small>';return;}
+  var vals=hs.map(function(x){return x[k];}),mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals);
+  if(mx===mn){mx+=1;mn-=1;}
+  var W=320,H=150,L=44,R=8,Tp=10,B=22,pts=hs.map(function(x,i){return [L+(W-L-R)*i/(hs.length-1),Tp+(H-Tp-B)*(1-(x[k]-mn)/(mx-mn))];});
+  function f(v){return k==='t'?fmt(v):k==='e'?v.toFixed(2)+'x':v.toFixed(1)+'%';}
+  var last=hs[hs.length-1];
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto"><polyline fill="none" stroke="var(--ac)" stroke-width="2" points="'+pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1);}).join(' ')+'"/>'
+   +'<circle cx="'+pts[pts.length-1][0].toFixed(1)+'" cy="'+pts[pts.length-1][1].toFixed(1)+'" r="3.5" fill="var(--ac)"/>'
+   +'<text x="2" y="'+(Tp+8)+'" font-size="10" fill="var(--mut)">'+f(mx)+'</text><text x="2" y="'+(H-B)+'" font-size="10" fill="var(--mut)">'+f(mn)+'</text>'
+   +'<text x="'+L+'" y="'+(H-6)+'" font-size="10" fill="var(--mut)">'+hs[0].d+'</text><text x="'+(W-R)+'" y="'+(H-6)+'" font-size="10" text-anchor="end" fill="var(--mut)">'+last.d+'</text></svg>';
+  el.innerHTML=svg+'<small>最新 '+last.d+'：總資產 '+fmt(last.t)+'｜曝險 '+last.e.toFixed(2)+'x｜現金 '+last.c.toFixed(1)+'%（共 '+hs.length+' 筆）</small>';
+}
+function avRefresh(){
+  var sel=document.getElementById('av_sel'),cur=sel.value,h='';
+  st.rows.forEach(function(r,i){if(r.cat!=='cash')h+='<option value="'+i+'">'+esc(r.code||NAMES[r.cat])+'</option>';});
+  sel.innerHTML=h;
+  if(cur&&sel.querySelector('option[value="'+cur+'"]'))sel.value=cur;
+  avCalc();
+}
+function avCalc(){
+  var o=document.getElementById('av_out'),r=st.rows[document.getElementById('av_sel').value];
+  if(!r){o.textContent='請先新增持股。';return;}
+  var n0=num(r.n)*U(),c0=st.mode==='total'?(n0>0?num(r.cost)/n0:0):num(r.cost);
+  var add=num(document.getElementById('av_n').value)*U(),p=num(document.getElementById('av_p').value)||num(r.px);
+  if(add<=0||p<=0){o.textContent='目前均價 '+c0.toFixed(2)+'，現價 '+num(r.px)+'。輸入加碼張數即可試算。';return;}
+  var N=n0+add,avg=(n0*c0+add*p)/N,px=num(r.px);
+  o.innerHTML='新均價 <b>'+avg.toFixed(2)+'</b>（原 '+c0.toFixed(2)+'，'+(avg<c0?'降低 ':'提高 ')+Math.abs(avg-c0).toFixed(2)+'）<br>持有 '+fmt(N/1000,2)+' 張｜需投入 '+fmt(add*p)+' 元'+(px>0?'<br>以現價 '+px+' 計：損益 <b class="'+cls(px-avg)+'">'+sg((px/avg-1)*100,2)+'%</b>':'');
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
+function metrics(r){
+  if(r.cat==='cash'){var a0=num(r.amt);return {mv:a0,cost:a0,pl:0,pct:0,ex:a0*num(r.lev)};}
+  var n=num(r.n)*U(),mv=n*num(r.px);
+  var cost=st.mode==='total'?num(r.cost):n*num(r.cost);
+  var pl=mv-cost;
+  return {mv:mv,cost:cost,pl:pl,pct:cost>0?pl/cost*100:0,ex:mv*num(r.lev)};
+}
+function fld(i,k,l,v){return '<div><label>'+l+'</label><input type="number" step="any" inputmode="decimal" data-i="'+i+'" data-k="'+k+'" value="'+(v===undefined?'':v)+'"></div>';}
+
+function render(){
+  document.getElementById('cmode').value=st.mode;
+  ['tgt','lo','hi','inv','sc2'].forEach(function(k){document.getElementById(k).value=st[k==='tgt'?'target':k]||'';});
+  ['etf','stock','l2','cash'].forEach(function(k){document.getElementById('ta_'+k).value=(st.ta&&st.ta[k])||'';});
+  document.getElementById('tcash').value=st.tcash||'';
+  document.getElementById('umode').value=st.unit;
+  var h='';
+  st.rows.forEach(function(r,i){
+    h+='<div class="row"><div class="top">'
+     +'<input type="text" list="tk" autocomplete="off" data-i="'+i+'" data-k="code" value="'+String(r.code||'').replace(/"/g,'&quot;')+'" placeholder="輸入代號或名稱，例如 0050、台積電">'
+     +'<select data-i="'+i+'" data-k="cat">'
+     +Object.keys(NAMES).map(function(k){return '<option value="'+k+'"'+(k===r.cat?' selected':'')+'>'+NAMES[k]+'</option>';}).join('')
+     +'</select><button data-del="'+i+'">刪除</button></div>'
+     +(r.cat==='cash'?'<div class="grid">'+fld(i,'amt','金額（元）',r.amt)+fld(i,'lev','曝險倍率',r.lev)+'</div>'
+     :'<div class="grid">'+fld(i,'n',st.unit==='lot'?'張數':'股數',r.n)+fld(i,'cost',st.mode==='total'?'總成本':'每股成本',r.cost)+fld(i,'px','現價',r.px)+'</div><div class="grid" style="margin-top:8px">'+fld(i,'lev','曝險倍率',r.lev)+'</div>')
+     +'<div class="calc" id="c'+i+'"></div></div>';
+  });
+  document.getElementById('rows').innerHTML=h||'<small>尚無持股，請按上方新增。</small>';
+  avRefresh();
+  drawHist();
+  calc();
+}
+
+function calc(){
+  var agg={},tmv=0,tex=0,tpl=0,tcost=0,cash=0;
+  Object.keys(NAMES).forEach(function(k){agg[k]={mv:0,ex:0,pl:0};});
+  var ms=st.rows.map(function(r){
+    var m=metrics(r),a=agg[r.cat]||(agg[r.cat]={mv:0,ex:0,pl:0});
+    if(r.cat==='cash'){cash+=m.mv;}else{tmv+=m.mv;tpl+=m.pl;tcost+=m.cost;}
+    tex+=m.ex;a.mv+=m.mv;a.ex+=m.ex;a.pl+=m.pl;return m;
+  });
+  var total=tmv+cash;
+  st.rows.forEach(function(r,i){
+    var m=ms[i],el=document.getElementById('c'+i);
+    if(!el)return;
+    if(r.cat==='cash'){el.innerHTML='<span>金額 <b>'+fmt(m.mv)+'</b></span><span>占總資產 <b>'+(total>0?fmt(m.mv/total*100,1):'0.0')+'%</b></span><span>曝險 <b>'+fmt(m.ex)+'</b></span>';return;}
+    el.innerHTML='<span>股數 <b>'+fmt(num(st.rows[i].n)*U())+'</b></span><span>市值 <b>'+fmt(m.mv)+'</b></span><span>占總資產 <b>'+(total>0?fmt(m.mv/total*100,1):'0.0')+'%</b></span>'
+      +'<span>損益 <b class="'+cls(m.pl)+'">'+sg(m.pl)+'（'+sg(m.pct,2)+'%）</b></span>';
+  });
+  function set(id,t,c){var e=document.getElementById(id);e.textContent=t;e.className=c||'';}
+  set('sTotal',fmt(total));
+  set('sExp',(total>0?(tex/total).toFixed(2):'0.00')+'x');
+  (function(){
+    var lo=parseFloat(st.lo),hi=parseFloat(st.hi),ex=total>0?tex/total:0,al=document.getElementById('alert'),se=document.getElementById('sExp'),msg='';
+    if(total>0&&isFinite(hi)&&ex>hi){msg='⚠ 曝險 '+ex.toFixed(2)+'x 高於上限 '+hi+'x，建議再平衡（見「快速再平衡」）';se.className='up';}
+    else if(total>0&&isFinite(lo)&&ex<lo){msg='⚠ 曝險 '+ex.toFixed(2)+'x 低於下限 '+lo+'x，建議再平衡（見「快速再平衡」）';se.className='dn';}
+    al.style.display=msg?'block':'none';al.textContent=msg;
+  })();
+  set('sPL',sg(tpl)+(tcost>0?'（'+sg(tpl/tcost*100,2)+'%）':''),cls(tpl));
+  set('sExpAmt',fmt(tex));
+  set('sCost',fmt(tcost));
+  set('sMV',fmt(tmv));
+  drawPie();
+  rebAll();stress();allocTab();avCalc();
+  var t='';
+  Object.keys(agg).forEach(function(k){
+    var a=agg[k];
+    t+='<tr><td>'+(NAMES[k]||k)+'</td><td>'+fmt(a.mv)+'</td><td>'+(total>0?fmt(a.mv/total*100,1):'0.0')+'%</td><td>'+(total>0?(a.ex/total).toFixed(2):'0.00')+'x</td><td class="'+cls(a.pl)+'">'+sg(a.pl)+'</td></tr>';
+  });
+  document.getElementById('cats').innerHTML=t;
+  save();
+}
+
+document.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.id==='tgt'||t.id==='tcash'){st[t.id==='tgt'?'target':'tcash']=t.value;rebAll();save();return;}
+  if(t.id==='lo'||t.id==='hi'||t.id==='sc2'){st[t.id]=t.value;calc();return;}
+  if(t.id==='inv'){st.inv=t.value;rebAll();save();return;}
+  if(t.id.indexOf('ta_')===0){st.ta=st.ta||{};st.ta[t.id.slice(3)]=t.value;allocTab();save();return;}
+  if(t.id==='av_n'||t.id==='av_p'){avCalc();return;}
+  var i=t.getAttribute('data-i'),k=t.getAttribute('data-k');
+  if(i===null||t.tagName==='SELECT')return;
+  st.rows[i][k]=t.value;calc();
+});
+document.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='av_sel'){avCalc();return;}
+  if(t.id==='hm'){drawHist();return;}
+  if(t.id==='umode'){
+    var fac=(t.value==='lot'&&st.unit==='share')?0.001:(t.value==='share'&&st.unit==='lot')?1000:1;
+    st.rows.forEach(function(r){if(r.n!==''&&r.n!==undefined)r.n=+(num(r.n)*fac).toFixed(6);});
+    st.unit=t.value;render();return;
+  }
+  if(t.id==='pmode'){drawPie();return;}
+  if(t.getAttribute('data-k')==='code'){
+    var i0=t.getAttribute('data-i'),k0=findTk(t.value);
+    if(k0){var r0=st.rows[i0];r0.code=k0+' '+TK[k0][0];r0.cat=TK[k0][1];r0.lev=LEV[r0.cat];render();}
+    return;
+  }
+  if(t.id==='cmode'){
+    st.rows.forEach(function(r){var n=num(r.n)*U(),c=num(r.cost);
+      if(t.value==='total'&&st.mode==='unit')r.cost=+(c*n).toFixed(2);
+      else if(t.value==='unit'&&st.mode==='total')r.cost=n>0?+(c/n).toFixed(4):0;});
+    st.mode=t.value;render();return;
+  }
+  if(t.tagName==='SELECT'){var i=t.getAttribute('data-i');st.rows[i].cat=t.value;st.rows[i].lev=LEV[t.value];render();}
+});
+document.addEventListener('click',function(e){
+  var a=e.target.getAttribute('data-add'),d=e.target.getAttribute('data-del');
+  if(a){st.rows.push({cat:a,code:a==='cash'?'現金':'',n:'',cost:'',px:'',amt:'',lev:LEV[a]});render();}
+  else if(d!==null){st.rows.splice(parseInt(d,10),1);render();}
+  else if(e.target.id==='reset'){st=defaults();render();}
+});
+render();
+document.getElementById('bex').onclick=function(){var t=JSON.stringify(st),b=document.getElementById('bk');b.value=t;b.select();try{navigator.clipboard.writeText(t);}catch(e){}};
+document.getElementById('bim').onclick=function(){try{var o=JSON.parse(document.getElementById('bk').value);if(!o||!Array.isArray(o.rows))throw 0;st=o;if(!st.unit)st.unit='lot';migrateCash();render();}catch(e){alert('備份格式不正確');}};
+
+function pnum(v){v=String(v==null?'':v).replace(/,/g,'');var n=parseFloat(v);return isFinite(n)&&n>0?n:0;}
+function setSt(t){document.getElementById('ust').textContent=t;}
+function codeOf(r){return String(r.code||'').trim().split(/\s+/)[0].toUpperCase();}
+function applyMap(m){var ok=0,miss=[];st.rows.forEach(function(r){var c=codeOf(r);if(!c||r.cat==='cash')return;if(m[c]){r.px=m[c];ok++;}else miss.push(c);});return {ok:ok,miss:miss};}
+var SRC=['https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL','https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes'];
+var PROXY=[function(u){return 'https://api.allorigins.win/raw?url='+encodeURIComponent(u);},function(u){return 'https://corsproxy.io/?url='+encodeURIComponent(u);}];
+var tries=0;
+function tryFetch(label,u){
+  return fetch(u,{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(a){if(!Array.isArray(a))throw new Error('資料格式不符');return {label:label,data:a};});
+}
+function updatePrices(){
+  if(!st.rows.some(codeOf)){setSt('請先輸入持股代號。');return;}
+  var n=++tries;setSt('更新中…（第 '+n+' 次，'+new Date().toLocaleTimeString('zh-TW')+'）');
+  var m={},log=[];
+  Promise.all([['上市',SRC[0]],['上櫃',SRC[1]]].map(function(j){
+    return tryFetch(j[0]+'直連',j[1]).catch(function(e){
+      log.push(j[0]+'直連失敗（'+e.message+'）');
+      return PROXY.reduce(function(pr,f,i){return pr.catch(function(){return tryFetch(j[0]+'代理'+(i+1),f(j[1]));});},Promise.reject(e));
+    }).then(function(r){
+      r.data.forEach(function(x){var c=x.Code||x.SecuritiesCompanyCode,v=pnum(x.ClosingPrice!==undefined?x.ClosingPrice:x.Close);if(c&&v)m[String(c).toUpperCase()]=v;});
+      log.push(r.label+'成功');
+    }).catch(function(e){log.push(j[0]+'全部失敗（'+e.message+'）');});
+  })).then(function(){
+    var t=new Date().toLocaleTimeString('zh-TW');
+    if(!Object.keys(m).length){setSt('第 '+n+' 次 '+t+' 無法取得報價\n'+log.join('\n')+'\n請改用「貼上報價」或「從剪貼簿貼上」。');return;}
+    var o=applyMap(m);st.upd=new Date().toLocaleString('zh-TW');render();
+    setSt('已更新 '+o.ok+' 檔｜'+st.upd+'\n'+log.join('；')+(o.miss.length?'\n找不到：'+o.miss.join('、'):''));
+  });
+}
+document.getElementById('pst').onclick=function(){var b=document.getElementById('pbox');b.style.display=b.style.display==='none'?'block':'none';};
+var applyClip=function(){if(!navigator.clipboard||!navigator.clipboard.readText){setSt('此瀏覽器不支援讀取剪貼簿，請用「貼上報價」。');return;}navigator.clipboard.readText().then(function(t){document.getElementById('pq').value=t;document.getElementById('pgo').click();}).catch(function(){setSt('無法讀取剪貼簿，請用「貼上報價」手動貼上。');});};
+document.getElementById('upd').onclick=applyClip;
+document.getElementById('sc').onclick=function(){location.href='shortcuts://run-shortcut?name='+encodeURIComponent('抓收盤價');};
+document.getElementById('snap').onclick=function(){snapshot();};
+document.getElementById('hclr').onclick=function(){if(confirm('確定清除所有歷史紀錄？')){st.hist=[];save();drawHist();}};
+document.getElementById('pgo').onclick=function(){
+  var m={};document.getElementById('pq').value.split(/\n/).forEach(function(l){var x=l.match(/^\s*([0-9A-Za-z]+)[\s,，:：=]+([\d,.]+)/);if(x&&pnum(x[2]))m[x[1].toUpperCase()]=pnum(x[2]);});
+  var o=applyMap(m);st.upd=new Date().toLocaleString('zh-TW');render();
+  if(o.ok>0)snapshot();
+  setSt('已套用 '+o.ok+' 檔｜'+st.upd+(o.miss.length?'｜未提供：'+o.miss.join('、'):''));
+  document.getElementById('pbox').style.display='none';
+};
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(function(){});}
+</script>
+</html>
